@@ -34,7 +34,7 @@ void chuni_io_config_load(
     cfg->vk_ir = GetPrivateProfileIntW(L"io3", L"ir", VK_SPACE, filename);
 
     for (i = 0 ; i < 32 ; i++) {
-        swprintf(key, L"cell%i", i + 1);
+        swprintf(key, 6, L"cell%i", i + 1);
         cfg->vk_cell[i] = GetPrivateProfileIntW(
                 L"slider",
                 key,

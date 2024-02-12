@@ -45,7 +45,7 @@ static void status_print(const uint8_t *state)
 	static uint8_t prev[32];
 	static uint8_t prev_opbtn, prev_beams;
 	uint8_t opbtn, beams;
-	
+
 	if ( memcmp(state, prev, 32) != 0 )
 	{
 		//system("cls");
@@ -59,7 +59,7 @@ static void status_print(const uint8_t *state)
 	
 		memcpy(prev, state, 32);
 	}
-	
+
 	reactive_led(rgb_data, state);
 	chuni_io_slider_set_leds(rgb_data);
 	

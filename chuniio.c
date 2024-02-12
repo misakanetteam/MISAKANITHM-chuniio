@@ -1,3 +1,4 @@
+#include <string.h>
 #include <windows.h>
 
 #include <process.h>
@@ -11,9 +12,6 @@
 #include "chuniio.h"
 #include "config.h"
 #include "hid_impl.h"
-
-#define INPUT_REPORT_ID 0x00
-#define OUTPUT_REPORT_ID 0x00
 
 #define DEBUG 0
 
@@ -30,7 +28,7 @@ static HANDLE g_device_handle;
 
 #pragma pack(1)
 typedef struct input_report_s {
-	uint8_t  report_id; // 0x00
+	uint8_t  reportid;
 	uint8_t  beams; 
 	uint8_t  opbtn;     // 0b00000CST (Left = Coin, Middle = Service, Right = Test)
 	uint8_t  slider[32];
@@ -38,42 +36,37 @@ typedef struct input_report_s {
 
 input_report_t g_controller_data;
 
-__declspec(dllexport) uint16_t __cdecl chuni_io_get_api_version(void)
+uint16_t chuni_io_get_api_version(void)
 {
     return 0x0101;
 }
 
 static int controller_read_buttons(){
 	/* read hid report */
-	(void) hid_get_report(g_device_handle, (uint8_t *)&g_controller_data, INPUT_REPORT_ID, sizeof(input_report_t));
+	(void) hid_get_report(g_device_handle, (uint8_t *)&g_controller_data, sizeof(input_report_t));
 
-	
 	return 0;
 }
 
 
-static int controller_write_leds(const uint8_t *lamp_bits){
-	//static uint8_t led_data3[6]; /* tower leds? */
+static int controller_write_leds(const uint8_t *lamp_bits) {
+	uint8_t *tx = (char *)malloc(61);
+	tx[0] = 0;
+	memcpy(tx + 1, lamp_bits, 60);
+	hid_set_report(g_device_handle, tx, 61);
 
-	uint8_t yuanled[62] = {0};
-	
-	for (int i = 0; i<31; i++)
-	{
-		yuanled[2*i]    = (lamp_bits[3*i]   >> 3);      /* 5 bit blue */
-		yuanled[2*i]   |= (lamp_bits[3*i+1] >> 2) << 5; /* 3 bit red */  
-		yuanled[2*i+1]  = (lamp_bits[3*i+1] >> 5);      /* 3 bit red cont. */  
-		yuanled[2*i+1] |= (lamp_bits[3*i+2] >> 3) << 3; /* 6 bit green */  
-	}
-
-	hid_set_report(g_device_handle, (const uint8_t *)yuanled, OUTPUT_REPORT_ID, 62);
+	tx[0] = 1;
+	memcpy(tx + 1, lamp_bits + 60, 33);
+	hid_set_report(g_device_handle, tx, 61);
+	free(tx);
 	
 	return 0;
 }
 
-__declspec(dllexport) HRESULT __cdecl chuni_io_jvs_init(void)
+HRESULT chuni_io_jvs_init(void)
 {
     chuni_io_config_load(&chuni_io_cfg, L".\\segatools.ini");
-	if ( hid_open_device(&g_device_handle, 0x1973, 0x2001) != 0 )
+	if ( hid_open_device(&g_device_handle, 0x2e8a, 0x2002) != 0 )
 	{
         return -1;		
 	}
@@ -84,11 +77,19 @@ __declspec(dllexport) HRESULT __cdecl chuni_io_jvs_init(void)
         printf("Error %d setnuminputbuff\r\n",GetLastError());
         return -1;
     }
-	
+
+    uint8_t hid_enable_report[35] = {1};
+    
+    if (!HidD_GetInputReport(g_device_handle, &hid_enable_report, 35))
+    {
+        printf("Error enabling controller, %d", GetLastError());
+        return -1;
+    }
+
     return S_OK;
 }
 
-__declspec(dllexport) void __cdecl chuni_io_jvs_read_coin_counter(uint16_t *out)
+void chuni_io_jvs_read_coin_counter(uint16_t *out)
 {
     if (out == NULL) {
         return;
@@ -106,7 +107,7 @@ __declspec(dllexport) void __cdecl chuni_io_jvs_read_coin_counter(uint16_t *out)
     *out = chuni_io_coins;
 }
 
-__declspec(dllexport) void __cdecl chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
+void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
 {
     size_t i;
 
@@ -139,12 +140,12 @@ __declspec(dllexport) void __cdecl chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *be
 	*beams |= g_controller_data.beams & 0x3F;
 }
 
-__declspec(dllexport) HRESULT __cdecl chuni_io_slider_init(void)
+HRESULT chuni_io_slider_init(void)
 {
     return S_OK;
 }
 
-__declspec(dllexport) void __cdecl chuni_io_slider_start(chuni_io_slider_callback_t callback)
+void chuni_io_slider_start(chuni_io_slider_callback_t callback)
 {
     if (chuni_io_slider_thread != NULL) {
         return;
@@ -159,7 +160,7 @@ __declspec(dllexport) void __cdecl chuni_io_slider_start(chuni_io_slider_callbac
             NULL);
 }
 
-__declspec(dllexport) void __cdecl chuni_io_slider_stop(void)
+void chuni_io_slider_stop(void)
 {
     if (chuni_io_slider_thread == NULL) {
         return;
@@ -173,7 +174,7 @@ __declspec(dllexport) void __cdecl chuni_io_slider_stop(void)
     chuni_io_slider_stop_flag = false;
 }
 
-__declspec(dllexport) void __cdecl chuni_io_slider_set_leds(const uint8_t *rgb)
+void chuni_io_slider_set_leds(const uint8_t *rgb)
 {
 	controller_write_leds(rgb);
 }

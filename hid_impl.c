@@ -1,3 +1,4 @@
+#include <string.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -65,7 +66,7 @@ printf("\r\nlooking for substring %s in device path\r\n", vidpidstr);
             continue;
         }
 #if DEBUG == 1
-        printf("\r\nLaverita found at %s\r\n", &pspdidd->DevicePath);
+        printf("\r\nMISAKANITHM found at %s\r\n", &pspdidd->DevicePath);
 #endif
         //copy devpath into lPath
         strcpy(lPath, pspdidd->DevicePath);
@@ -90,9 +91,8 @@ int hid_open_device(HANDLE *device_handle, uint16_t vid, uint16_t pid){
 	
     if (!get_device_path(path, vid, pid))
     {
-#if DEBUG == 1
-        printf("\r\nLaverita not detected.\r\n");
-#endif
+        printf("\r\nMISAKANITHM not detected.\r\n");
+
         err_count++;
         if (err_count > 2){
             printf("Could not init device after multiple attempts. Exiting.\r\n");
@@ -113,14 +113,14 @@ int hid_open_device(HANDLE *device_handle, uint16_t vid, uint16_t pid){
     return 0;
 }
 
-int hid_get_report(HANDLE device_handle, uint8_t *buf, uint8_t report_id, uint8_t nb_bytes)
+int hid_get_report(HANDLE device_handle, uint8_t *buf, uint8_t nb_bytes)
 {
     DWORD          bytesRead = 0;
 	static uint8_t tmp_buf[128];
 	
 	if (buf == NULL) return -1;
 	
-    tmp_buf[0] = report_id;
+    tmp_buf[0] = 0;
 
     ReadFile(device_handle, tmp_buf, nb_bytes*2, &bytesRead, NULL);
     // bytesRead should either be nb_bytes*2 (if it successfully read 2 reports) or nb_bytes (only one)
@@ -135,26 +135,18 @@ int hid_get_report(HANDLE device_handle, uint8_t *buf, uint8_t report_id, uint8_
     /* HID read ok, copy latest report bytes */
     memcpy(buf, tmp_buf + bytesRead - nb_bytes, nb_bytes);
 	
-    return 0;	
+    return 0;
 }
 
-
-int hid_set_report(HANDLE device_handle, const uint8_t *buf, uint8_t report_id, uint8_t nb_bytes)
+int hid_set_report(HANDLE device_handle, const uint8_t *buf, uint8_t nb_bytes)
 {
-    DWORD     bytesWritten = 0;
-	static uint8_t tmp_buf[128];
-	
-	tmp_buf[0] = report_id;
-	memcpy(tmp_buf+1, buf, nb_bytes);
-	
+    char *tmp_buf = malloc(nb_bytes + 1);
+    tmp_buf[0] = 0;
+    memcpy(tmp_buf + 1, buf, nb_bytes);
     /* send HID Report */
-    WriteFile(device_handle, tmp_buf, 63, &bytesWritten, NULL); //TODO: fix this, get 63 value from the device getcaps
-	
-#if DEBUG == 1
-        printf("Wrote %u bytes (expected %u) to report id %d. (err = %d)\r\n", bytesWritten, 63, report_id, GetLastError());
-#endif
-
-    if ( bytesWritten == 63 )
+    DWORD     bytesWritten = HidD_SetOutputReport(device_handle, tmp_buf, nb_bytes + 1);
+    free(tmp_buf);
+    if ( bytesWritten == nb_bytes + 1 )
         return 0;
 
     return -1;
